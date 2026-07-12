@@ -3,7 +3,7 @@ import Logo from './Logo';
 import Form from './Form';
 import PackingList from './PackingList';
 import Stats from './Stats';
-import './TravelList.css';
+import './TravelList.module.css';
 
 export default function TravelList() {
   const [items, setItems] = useState([]);
