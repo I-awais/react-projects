@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import styles from './UsePopcorn.module.css';
 
 const tempMovieData = [
@@ -52,26 +52,63 @@ const average = (arr) =>
   arr.reduce((acc, cur, i, arr) => acc + cur / arr.length, 0);
 
 const KEY = 'f9770aec';
+//http://www.omdbapi.com/?i=tt3896198&apikey=f9770aec
 
 export default function UsePopCorn() {
   const [movies, setMovies] = useState(tempMovieData);
   const [watched, setWatched] = useState(tempWatchedData);
+  const [query, setQuery] = useState('');
+  const [selectedId, setSelectedId] = useState(null);
 
-  //http://www.omdbapi.com/?i=tt3896198&apikey=f9770aec
-
-  fetch(`http://www.omdbapi.com/?i=tt3896198&apikey=${KEY}&s=interstellar`)
-    .then((res) => res.json())
-    .then((data) => console.log(data));
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    async function fetchMovies() {
+      try {
+        setLoading(true);
+        setError('');
+        const res = await fetch(
+          `http://www.omdbapi.com/?i=tt3896198&apikey=${KEY}&s=${query}`,
+          { signal: controller.signal },
+        );
+        if (!res.ok) {
+          throw new Error('Something went wrong while fetching movies');
+        }
+        const data = await res.json();
+        if (data.Response === 'False') {
+          throw new Error('🛑 Movie not found!');
+        }
+        setMovies(data.Search);
+      } catch (err) {
+        console.log(err.message);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    if (query.length < 3) {
+      setMovies([]);
+      setError('');
+      return;
+    }
+    fetchMovies();
+    return function () {
+      controller.abort();
+    };
+  }, [query]);
 
   return (
     <>
       <Navbar>
-        <Search />
+        <Search query={query} setQuery={setQuery} />
         <NumResults movies={movies} />
       </Navbar>
       <Main>
         <Box>
-          <MovieList movies={movies} />
+          {loading && <Loader />}
+          {!loading && !error && <MovieList movies={movies} />}
+          {error && <ErrorMessage message={error} />}
         </Box>
         <Box>
           <WatchedSummary watched={watched} />
@@ -81,6 +118,13 @@ export default function UsePopCorn() {
       </Main>
     </>
   );
+}
+
+function Loader() {
+  return <p className={styles['loader']}> Loading...</p>;
+}
+function ErrorMessage({ message }) {
+  return <p className={styles['error']}> {message}</p>;
 }
 
 function Navbar({ children }) {
@@ -101,9 +145,7 @@ function Logo() {
   );
 }
 
-function Search() {
-  const [query, setQuery] = useState('');
-
+function Search({ query, setQuery }) {
   return (
     <input
       className="search"
@@ -117,7 +159,7 @@ function Search() {
 function NumResults({ movies }) {
   return (
     <p className={styles['num-results']}>
-      Found <strong>{movies.length}</strong> results
+      Found <strong>{movies?.length}</strong> results
     </p>
   );
 }
